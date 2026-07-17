@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>嘎嘎的记账好帮手</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --green: #38D39F; --green-hover: #32C682; --green-light: #DDF7E5;
+  --yellow: #FFD95A; --yellow-light: #FFF8E1;
+  --bg: #FFFDF8; --card: #FFFFFF; --text: #2B2B2B; --text-light: #888888; --danger: #FF7B72;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.04); --shadow: 0 8px 30px rgba(0,0,0,.05);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.08); --radius: 20px; --radius-sm: 14px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex; justify-content: center; align-items: center;
+  font-family: "PingFang SC", "MiSans", "HarmonyOS Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text); -webkit-tap-highlight-color: transparent;
+  background: radial-gradient(ellipse at 20% 0%, rgba(255,217,90,.08) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 100%, rgba(56,211,159,.06) 0%, transparent 50%),
+              var(--bg);
+  overflow-x: hidden;
+}
+
+/* 装饰元素 */
+body::before {
+  content: ''; position: fixed; top: 40px; left: 10%; width: 120px; height: 60px;
+  background: radial-gradient(ellipse, rgba(255,217,90,.15) 0%, transparent 70%);
+  border-radius: 50%; pointer-events: none; z-index: 0;
+}
+body::after {
+  content: ''; position: fixed; top: 80px; right: 8%; width: 80px; height: 40px;
+  background: radial-gradient(ellipse, rgba(56,211,159,.10) 0%, transparent 70%);
+  border-radius: 50%; pointer-events: none; z-index: 0;
+}
+
+.app-container {
+  width: 100%; max-width: 520px; height: 100vh; max-height: 900px;
+  display: flex; flex-direction: column; position: relative; z-index: 1;
+  opacity: 0; animation: pageIn .6s ease forwards;
+}
+@keyframes pageIn { to { opacity: 1; } }
+
+/* ===== Header ===== */
+.app-header {
+  flex-shrink: 0; padding: 24px 20px 16px;
+  background: linear-gradient(180deg, rgba(255,217,90,.25) 0%, rgba(255,253,248,0) 100%);
+  text-align: center; position: relative;
+}
+.header-top {
+  display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;
+}
+.header-icon {
+  width: 48px; height: 48px; border-radius: 16px;
+  background: linear-gradient(135deg, #FFD95A 0%, #F0C040 100%);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(240,192,64,.3);
+  font-size: 26px;
+}
+.header-title {
+  font-size: 22px; font-weight: 600; letter-spacing: .5px;
+}
+.header-sub {
+  font-size: 13px; color: var(--text-light); margin-top: 2px;
+}
+
+/* ===== Chat Area ===== */
+.chat-area {
+  flex: 1; overflow-y: auto; padding: 8px 16px 4px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 20px; gap: 12px;
+}
+.empty-duck {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: linear-gradient(135deg, #FFD95A 0%, #F5C842 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 40px; box-shadow: 0 8px 24px rgba(240,192,64,.25);
+  animation: float 3s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.empty-title { font-size: 18px; font-weight: 600; }
+.empty-desc { font-size: 14px; color: var(--text-light); text-align: center; line-height: 1.6; }
+
+/* ===== Message Row ===== */
+.message-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  animation: msgIn .35s ease;
+}
+@keyframes msgIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.message-row.self { justify-content: flex-end; }
+.message-row.other { justify-content: flex-start; }
+
+.avatar {
+  width: 40px; height: 40px; border-radius: 14px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; overflow: hidden;
+}
+.message-row.self .avatar { order: 2; }
+.message-row.other .avatar { order: 0; }
+.avatar.user {
+  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 60%, #fdfcfb 100%);
+  box-shadow: 0 2px 6px rgba(255,154,158,.25);
+}
+.avatar.assistant {
+  background: linear-gradient(135deg, #FFD95A 0%, #F0C040 100%);
+  box-shadow: 0 2px 6px rgba(240,192,64,.25);
+}
+
+.bubble-wrapper {
+  display: flex; flex-direction: column; gap: 3px; max-width: 72%;
+}
+.message-row.self .bubble-wrapper { align-items: flex-end; }
+.message-row.other .bubble-wrapper { align-items: flex-start; }
+
+.nickname { font-size: 12px; color: var(--text-light); padding: 0 6px; user-select: none; }
+
+.message-bubble {
+  padding: 12px 16px; font-size: 14px; line-height: 1.55;
+  word-break: break-all; position: relative;
+}
+.message-row.self .message-bubble {
+  background: var(--green-light); color: var(--text);
+  border-radius: var(--radius-sm) var(--radius-sm) 4px var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+.message-row.other .message-bubble {
+  background: var(--card); color: var(--text);
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-sm) 4px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* File bubble */
+.message-bubble.file-bubble {
+  background: var(--card); padding: 10px 14px;
+  display: flex; align-items: center; gap: 10px;
+  border-radius: var(--radius-sm) var(--radius-sm) 4px var(--radius-sm);
+}
+.file-icon { font-size: 30px; flex-shrink: 0; }
+.file-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.file-name { font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.file-size { font-size: 11px; color: var(--text-light); }
+
+/* Response card */
+.response-bubble {
+  background: var(--card); padding: 18px 20px;
+  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-sm) 4px;
+  box-shadow: var(--shadow);
+}
+.response-bubble .success-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+}
+.response-bubble .success-header .duck-icon { font-size: 24px; }
+.response-bubble .success-title { font-weight: 600; font-size: 16px; }
+.response-bubble .success-sub { font-size: 13px; color: var(--text-light); margin-top: 2px; }
+
+.summary-card {
+  background: var(--green-light); border-radius: 14px; padding: 14px 16px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-bottom: 16px;
+}
+.summary-card .sc-item { display: flex; flex-direction: column; gap: 2px; }
+.summary-card .sc-label { font-size: 11px; color: var(--text-light); }
+.summary-card .sc-value { font-size: 15px; font-weight: 500; }
+
+.response-bubble .file-list-title {
+  font-weight: 600; font-size: 14px; margin: 14px 0 8px; color: var(--text);
+}
+.response-bubble .file-item {
+  font-size: 13px; color: #555; margin: 3px 0; padding-left: 16px; position: relative;
+}
+.response-bubble .file-item::before {
+  content: ''; position: absolute; left: 4px; top: 6px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--green);
+}
+
+.response-bubble .skipped-title {
+  font-weight: 600; font-size: 14px; margin: 14px 0 8px; color: var(--danger);
+}
+.response-bubble .skipped-item { font-size: 13px; color: var(--danger); margin: 3px 0; padding-left: 16px; }
+
+.download-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 16px; height: 52px; padding: 0 28px;
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-hover) 100%);
+  color: #fff; border: none; border-radius: 16px;
+  font-size: 15px; font-weight: 500; cursor: pointer; text-decoration: none;
+  box-shadow: 0 4px 14px rgba(56,211,159,.35);
+  transition: transform .2s, box-shadow .2s;
+}
+.download-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,211,159,.4); }
+.download-btn:active { transform: scale(.97); }
+
+.feishu-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 10px; height: 48px; padding: 0 28px;
+  background: linear-gradient(135deg, #3370FF 0%, #2860DF 100%);
+  color: #fff; border: none; border-radius: 16px;
+  font-size: 15px; font-weight: 500; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(51,112,255,.35);
+  transition: transform .2s, box-shadow .2s;
+}
+.feishu-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(51,112,255,.4); }
+.feishu-btn:active { transform: scale(.97); }
+.feishu-btn:disabled { background: #b0c4e0; cursor: not-allowed; box-shadow: none; transform: none; }
+
+.recall-btn {
+  background: #ff4444; color: #fff; border: none;
+  border-radius: 50%; width: 32px; height: 32px; min-width: 32px;
+  font-size: 14px; cursor: pointer; display: inline-flex;
+  align-items: center; justify-content: center;
+  transition: background .2s, transform .2s;
+  flex-shrink: 0;
+}
+.recall-btn:hover { background: #cc0000; transform: scale(1.1); }
+.recall-btn:active { transform: scale(.92); }
+
+/* ===== Feishu Modal ===== */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,.45); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(30px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.modal-dialog {
+  background: #fff; border-radius: 22px; width: 100%; max-width: 380px;
+  margin: 0 20px; padding: 28px 24px 24px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.15);
+  animation: slideUp .3s ease;
+}
+.modal-title {
+  font-size: 18px; font-weight: 600; text-align: center;
+  margin-bottom: 20px; color: var(--text);
+}
+.modal-summary {
+  text-align: center; font-size: 14px; color: var(--text-light);
+  background: var(--green-light); border-radius: 12px;
+  padding: 10px 14px; margin-bottom: 20px; line-height: 1.6;
+}
+.modal-buttons {
+  display: flex; gap: 12px;
+}
+.modal-btn {
+  flex: 1; height: 56px; border: none; border-radius: 16px;
+  font-size: 15px; font-weight: 500; cursor: pointer;
+  color: #fff; transition: transform .2s, box-shadow .2s;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px;
+}
+.modal-btn:hover { transform: translateY(-2px); }
+.modal-btn:active { transform: scale(.96); }
+.modal-btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+.modal-btn-dining {
+  background: linear-gradient(135deg, #38D39F 0%, #32C682 100%);
+  box-shadow: 0 4px 14px rgba(56,211,159,.35);
+}
+.modal-btn-other {
+  background: linear-gradient(135deg, #FF9A56 0%, #FF7B3D 100%);
+  box-shadow: 0 4px 14px rgba(255,154,86,.35);
+}
+.modal-btn-icon { font-size: 22px; line-height: 1; }
+.modal-btn-label { font-size: 13px; }
+.modal-result {
+  text-align: center; padding: 16px 0;
+}
+.modal-result-icon { font-size: 36px; display: block; margin-bottom: 10px; }
+.modal-result-text { font-size: 15px; color: var(--text); }
+.modal-result-error { font-size: 14px; color: var(--danger); margin-top: 6px; }
+.modal-close-btn {
+  display: block; margin: 18px auto 0; height: 42px; padding: 0 28px;
+  background: #f5f5f5; border: none; border-radius: 14px;
+  font-size: 14px; color: var(--text); cursor: pointer;
+  transition: background .2s;
+}
+.modal-close-btn:hover { background: #eee; }
+
+/* Typing animation */
+.typing-dots { display: flex; gap: 4px; padding: 2px 0; }
+.typing-dots span {
+  width: 7px; height: 7px; border-radius: 50%; background: #d0d0d0;
+  animation: dotBounce 1.4s infinite ease-in-out both;
+}
+.typing-dots span:nth-child(1) { animation-delay: -.32s; }
+.typing-dots span:nth-child(2) { animation-delay: -.16s; }
+@keyframes dotBounce { 0%,80%,100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+.error-bubble { background: #FFF3F3 !important; border: 1px solid #FFDDDD; }
+
+/* ===== File Preview ===== */
+.file-preview-area {
+  padding: 4px 16px 0; display: flex; flex-wrap: wrap; gap: 6px;
+  max-height: 60px; overflow-y: auto; flex-shrink: 0;
+}
+.file-tag {
+  background: var(--card); border: 1px solid #eee; border-radius: 10px;
+  padding: 5px 10px; font-size: 12px; display: flex; align-items: center;
+  gap: 8px; box-shadow: var(--shadow-sm); animation: tagIn .25s ease;
+}
+@keyframes tagIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
+.file-tag .tag-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.file-tag .tag-remove { color: #bbb; cursor: pointer; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+.file-tag .tag-remove:hover { color: var(--danger); }
+
+/* ===== Input Area ===== */
+.input-area {
+  padding: 12px 16px; background: rgba(255,255,255,.85);
+  backdrop-filter: blur(10px); border-top: 1px solid rgba(0,0,0,.04);
+  display: flex; gap: 10px; align-items: stretch; flex-shrink: 0;
+}
+
+.file-upload-zone {
+  flex: 1; position: relative; border: 2px solid #eee;
+  border-radius: 16px; background: var(--card);
+  cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 56px; gap: 4px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+.file-upload-zone:hover { border-color: var(--green); box-shadow: var(--shadow); transform: translateY(-1px); }
+.file-upload-zone.dragover {
+  border-color: var(--green); background: var(--green-light);
+  box-shadow: var(--shadow-lg);
+}
+.file-upload-icon-sm { font-size: 22px; }
+.file-upload-text-sm { font-size: 12px; color: var(--text-light); }
+.file-upload-input {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer;
+}
+
+.send-btn {
+  width: 60px; min-height: 56px; border-radius: 16px; border: none;
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-hover) 100%);
+  color: #fff; font-size: 15px; font-weight: 500; cursor: pointer;
+  flex-shrink: 0; box-shadow: 0 4px 14px rgba(56,211,159,.35);
+  transition: transform .2s, box-shadow .2s;
+}
+.send-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,211,159,.4); }
+.send-btn:active { transform: scale(.95); }
+.send-btn:disabled { background: #c8e6d8; cursor: not-allowed; box-shadow: none; transform: none; }
+
+/* ===== Meal Type Input ===== */
+.meal-type-row {
+  padding: 0 16px 12px; flex-shrink: 0;
+}
+.meal-type-input {
+  width: 100%; height: 44px; padding: 0 16px;
+  border: 2px solid #eee; border-radius: 16px;
+  background: var(--card); font-size: 14px; color: var(--text);
+  box-shadow: var(--shadow-sm);
+  transition: border-color .2s, box-shadow .2s;
+  font-family: inherit; outline: none;
+}
+.meal-type-input:focus {
+  border-color: var(--green); box-shadow: var(--shadow);
+}
+.meal-type-input::placeholder { color: #ccc; }
+
+/* ===== Footer ===== */
+.app-footer {
+  flex-shrink: 0; text-align: center; padding: 8px 16px 16px;
+  font-size: 12px; color: #ccc;
+}
+.app-footer .footer-icon { font-size: 14px; }
+
+/* ===== Tips ===== */
+.tip-message { text-align: center; color: #ccc; font-size: 12px; padding: 6px; user-select: none; }
+
+/* ===== Mobile ===== */
+@media (max-width: 520px) {
+  .app-container { max-height: 100vh; }
+  .bubble-wrapper { max-width: 80%; }
+  .file-name { max-width: 130px; }
+  .app-header { padding: 18px 16px 12px; }
+  .header-title { font-size: 20px; }
+  .header-icon { width: 40px; height: 40px; font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <!-- Header -->
+  <div class="app-header">
+    <div class="header-top">
+      <div class="header-icon">🐤</div>
+      <div class="header-title">嘎嘎的记账好帮手</div>
+    </div>
+    <div class="header-sub">请上传发票、支付截图、水单，剩下的交给小助手～</div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area" id="chatArea">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-duck">🐤</div>
+      <div class="empty-title">Hi～我是嘎总的AI小助手！</div>
+      <div class="empty-desc">把发票、小票、支付截图交给我吧，<br>我会帮你自动整理和打包～</div>
+    </div>
+  </div>
+
+  <!-- File Preview -->
+  <div class="file-preview-area" id="filePreviewArea"></div>
+
+  <!-- Input Area -->
+  <div class="input-area">
+    <div class="file-upload-zone" id="uploadZone">
+      <span class="file-upload-icon-sm">📂</span>
+      <span class="file-upload-text-sm">拖拽文件或点击上传 · PDF JPG PNG · 最多10个</span>
+      <input type="file" class="file-upload-input" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png">
+    </div>
+    <button class="send-btn" id="sendBtn" disabled onclick="sendFiles()">发送</button>
+  </div>
+
+  <!-- Meal Type Manual Input -->
+  <div class="meal-type-row">
+    <input type="text" class="meal-type-input" id="mealTypeInput" placeholder="输入消费类型，如：夜宵/午餐/晚餐（留空则自动判断）" maxlength="10">
+  </div>
+
+  <!-- Footer -->
+  <div class="app-footer">
+    <span class="footer-icon">🐤</span> 小助手会帮你自动识别金额、日期、消费类型，让记账变得轻松一点
+  </div>
+
+</div>
+
+<!-- ===== Feishu Modal ===== -->
+<div class="modal-overlay" id="feishuModal" style="display:none">
+  <div class="modal-dialog" id="feishuModalDialog"></div>
+</div>
+
+<script>
+var selectedFiles = [];
+var pendingRequests = {};
+var chatArea = document.getElementById('chatArea');
+var fileInput = document.getElementById('fileInput');
+var sendBtn = document.getElementById('sendBtn');
+var filePreviewArea = document.getElementById('filePreviewArea');
+var uploadZone = document.getElementById('uploadZone');
+var emptyState = document.getElementById('emptyState');
+var MAX_FILES = 10;
+var MAX_SIZE = 10 * 1024 * 1024;
+var ALLOWED_TYPES = ['pdf', 'jpg', 'jpeg', 'png'];
+
+var USER_AVATAR = '<div class="avatar user"><svg viewBox="0 0 40 40" width="40" height="40"><circle cx="20" cy="15" r="10" fill="#f8b4c8"/><ellipse cx="20" cy="38" rx="14" ry="8" fill="#f8b4c8"/><circle cx="16" cy="14" r="2" fill="#333"/><circle cx="24" cy="14" r="2" fill="#333"/><path d="M15 20 Q20 25 25 20" stroke="#e88" fill="none" stroke-width="1.5"/><path d="M10 6 Q20 -2 30 6" stroke="#f8b4c8" fill="#f8b4c8" stroke-width="0"/></svg></div>';
+var ASSISTANT_AVATAR = '<div class="avatar assistant"><svg viewBox="0 0 40 40" width="40" height="40"><ellipse cx="20" cy="14" rx="11" ry="11" fill="#FFE082"/><ellipse cx="20" cy="38" rx="15" ry="7" fill="#FFE082"/><circle cx="15" cy="12" r="2.5" fill="#333"/><circle cx="25" cy="12" r="2.5" fill="#333"/><path d="M15 18 Q20 23 25 18" stroke="#F0B340" fill="none" stroke-width="2" stroke-linecap="round"/></svg></div>';
+
+function hideEmpty() {
+  if (emptyState) { emptyState.style.display = 'none'; emptyState = null; }
+}
+
+function addFiles(newFiles) {
+  hideEmpty();
+  for (var i = 0; i < newFiles.length; i++) {
+    var file = newFiles[i];
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (ALLOWED_TYPES.indexOf(ext) === -1) { appendSystemMessage('不支持该格式，请上传PDF或图片: ' + file.name); continue; }
+    if (file.size > MAX_SIZE) { appendSystemMessage('文件过大，请压缩后重试: ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + 'MB)'); continue; }
+    if (selectedFiles.length >= MAX_FILES) { appendSystemMessage('一次最多' + MAX_FILES + '个文件'); break; }
+    var dup = false;
+    for (var j = 0; j < selectedFiles.length; j++) { if (selectedFiles[j].name === file.name && selectedFiles[j].size === file.size) { dup = true; break; } }
+    if (!dup) { selectedFiles.push(file); }
+  }
+  renderFileTags();
+  fileInput.value = '';
+}
+
+fileInput.addEventListener('change', function(e) { addFiles(Array.from(e.target.files)); });
+uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', function(e) { e.preventDefault(); uploadZone.classList.remove('dragover'); });
+uploadZone.addEventListener('drop', function(e) {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) addFiles(Array.from(e.dataTransfer.files));
+});
+
+function renderFileTags() {
+  filePreviewArea.innerHTML = '';
+  if (selectedFiles.length === 0) { sendBtn.disabled = true; sendBtn.textContent = '发送'; return; }
+  sendBtn.disabled = false;
+  sendBtn.textContent = '发送(' + selectedFiles.length + ')';
+  selectedFiles.forEach(function(file, idx) {
+    var tag = document.createElement('div'); tag.className = 'file-tag';
+    var ns = document.createElement('span'); ns.className = 'tag-name'; ns.title = file.name; ns.textContent = file.name;
+    var rs = document.createElement('span'); rs.className = 'tag-remove'; rs.textContent = 'x';
+    rs.onclick = (function(i) { return function() { selectedFiles.splice(i, 1); renderFileTags(); }; })(idx);
+    tag.appendChild(ns); tag.appendChild(rs);
+    filePreviewArea.appendChild(tag);
+  });
+}
+
+function appendSystemMessage(text) {
+  hideEmpty();
+  var d = document.createElement('div'); d.className = 'tip-message';
+  d.style.color = '#FF7B72'; d.textContent = text;
+  chatArea.appendChild(d); chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function getFileIcon(ext) {
+  if (ext === 'pdf') return '📕';
+  if (ext === 'jpg' || ext === 'jpeg') return '🟢';
+  if (ext === 'png') return '🟢';
+  return '📎';
+}
+function formatFileSize(b) {
+  if (b < 1024) return b + 'B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + 'KB';
+  return (b / 1048576).toFixed(1) + 'MB';
+}
+
+function appendUserFileMessage(file, messageId) {
+  hideEmpty();
+  var ext = file.name.split('.').pop().toLowerCase();
+  var d = document.createElement('div'); d.className = 'message-row self'; d.id = 'user_' + messageId;
+  d.innerHTML = USER_AVATAR +
+    '<div class="bubble-wrapper">' +
+      '<span class="nickname">嘎总</span>' +
+      '<div class="message-bubble file-bubble">' +
+        '<span class="file-icon">' + getFileIcon(ext) + '</span>' +
+        '<div class="file-info">' +
+          '<span class="file-name">' + file.name + '</span>' +
+          '<span class="file-size">' + formatFileSize(file.size) + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  chatArea.appendChild(d); chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function appendLoadingMessage(messageId) {
+  hideEmpty();
+  var d = document.createElement('div'); d.className = 'message-row other'; d.id = 'loading_' + messageId;
+  d.innerHTML = ASSISTANT_AVATAR +
+    '<div class="bubble-wrapper">' +
+      '<span class="nickname">嘎总的AI小助手</span>' +
+      '<div class="message-bubble" style="padding:10px 18px;">' +
+        '<div class="typing-dots"><span></span><span></span><span></span></div>' +
+      '</div>' +
+    '</div>';
+  chatArea.appendChild(d); chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function removeLoading(messageId) { var e = document.getElementById('loading_' + messageId); if (e) e.remove(); }
+
+function appendAssistantResponse(data, messageId) {
+  removeLoading(messageId); hideEmpty();
+  var d = document.createElement('div'); d.className = 'message-row other'; d.id = 'ai_' + messageId;
+  var inner = '';
+  if (data.error) {
+    inner += '<div style="color:var(--danger);font-weight:600;margin-bottom:4px;">出错了</div>';
+    inner += '<div style="color:var(--text-light);font-size:13px;">' + data.error + '</div>';
+  } else {
+    var s = data.summary || {};
+    var a = Number.isInteger(s.total_amount) ? s.total_amount.toFixed(2) : s.total_amount.toFixed(2);
+    inner += '<div style="display:flex;align-items:flex-start;gap:8px;">';
+    inner += '<div style="flex:1;">';
+    inner += '<div class="success-header"><span class="duck-icon">🐤</span><div><div class="success-title">搞定啦！</div><div class="success-sub">小助理已经帮你整理完成～</div></div></div>';
+    inner += '<div class="summary-card">';
+    inner += '<div class="sc-item"><span class="sc-label">📅 日期</span><span class="sc-value">' + (s.date || '--') + '</span></div>';
+    inner += '<div class="sc-item"><span class="sc-label">🍜 类型</span><span class="sc-value">' + (s.meal_type || '--') + '</span></div>';
+    inner += '<div class="sc-item"><span class="sc-label">💰 金额</span><span class="sc-value">' + a + ' 元</span></div>';
+    inner += '<div class="sc-item"><span class="sc-label">📂 文件</span><span class="sc-value">' + (data.renamed_files ? data.renamed_files.length : 0) + ' 个</span></div>';
+    inner += '</div>';
+    if (data.renamed_files && data.renamed_files.length > 0) {
+      inner += '<div class="file-list-title">已处理文件</div>';
+      data.renamed_files.forEach(function(f) { inner += '<div class="file-item">' + f + '</div>'; });
+    }
+    if (data.skipped_files && data.skipped_files.length > 0) {
+      inner += '<div class="skipped-title">以下文件被跳过</div>';
+      data.skipped_files.forEach(function(f) { inner += '<div class="skipped-item">' + f + '</div>'; });
+    }
+    inner += '</div>'; // end flex:1
+    inner += '<button class="recall-btn" onclick="recallMessage(\'' + messageId + '\')" title="撤回">✕</button>';
+    inner += '</div>'; // end flex row
+    if (data.zip_filename && data.session_id) {
+      inner += '<a class="download-btn" href="/api/download/' + data.session_id + '" download>📥 下载 ZIP 文件</a>';
+    }
+    if (data.summary) {
+      inner += '<button class="feishu-btn" data-summary=\'' + JSON.stringify(data.summary) + '\' data-file-records=\'' + JSON.stringify(data.file_records || []) + '\' onclick="openFeishuModal(this)">📤 导入飞书</button>';
+    }
+  }
+
+  d.innerHTML = ASSISTANT_AVATAR +
+    '<div class="bubble-wrapper">' +
+      '<span class="nickname">嘎总的AI小助手</span>' +
+      '<div class="message-bubble response-bubble">' + inner + '</div>' +
+    '</div>';
+  chatArea.appendChild(d); chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function appendErrorResponse(msg, messageId) {
+  removeLoading(messageId); hideEmpty();
+  var d = document.createElement('div'); d.className = 'message-row other'; d.id = 'ai_' + messageId;
+  d.innerHTML = ASSISTANT_AVATAR +
+    '<div class="bubble-wrapper">' +
+      '<span class="nickname">嘎总的AI小助手</span>' +
+      '<div class="message-bubble error-bubble" style="border-radius:var(--radius-sm) var(--radius-sm) var(--radius-sm) 4px;display:flex;align-items:flex-start;gap:8px;">' +
+        '<span style="flex:1;">' + msg + '</span>' +
+        '<button class="recall-btn" onclick="recallMessage(\'' + messageId + '\')" title="撤回">✕</button>' +
+      '</div>' +
+    '</div>';
+  chatArea.appendChild(d); chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function openFeishuModal(btn) {
+  var summaryStr = btn.getAttribute('data-summary');
+  var fileRecordsStr = btn.getAttribute('data-file-records') || '[]';
+  if (!summaryStr) { alert('缺少汇总数据'); return; }
+  var summary = JSON.parse(summaryStr);
+  var fileRecords = JSON.parse(fileRecordsStr);
+
+  var a = Number.isInteger(summary.total_amount) ? summary.total_amount.toFixed(2) : summary.total_amount.toFixed(2);
+  var summaryText = (summary.date || '--') + ' ' + (summary.meal_type || '--') + ' ' + a + '元';
+  if (summary.content) { summaryText += ' ' + summary.content; }
+
+  var dialog = document.getElementById('feishuModalDialog');
+  var mealType = summary.meal_type || '';
+
+  var diningTypes = ['午餐', '晚餐', '夜宵', '配送费'];
+  var otherTypes = ['打车', '高铁', '配送费', '杂物'];
+  var showDining = diningTypes.indexOf(mealType) !== -1;
+  var showOther = otherTypes.indexOf(mealType) !== -1;
+
+  var buttonsHtml = '';
+  if (showDining) {
+    buttonsHtml +=
+      '<button class="modal-btn modal-btn-dining" onclick="doFeishuExport(\'dining\')">' +
+        '<span class="modal-btn-icon">🍽️</span>' +
+        '<span class="modal-btn-label">餐饮导入</span>' +
+      '</button>';
+  }
+  if (showOther) {
+    buttonsHtml +=
+      '<button class="modal-btn modal-btn-other" onclick="doFeishuExport(\'other\')">' +
+        '<span class="modal-btn-icon">🚗</span>' +
+        '<span class="modal-btn-label">其他导入</span>' +
+      '</button>';
+  }
+
+  dialog.innerHTML =
+    '<div class="modal-title">选择导入目标</div>' +
+    '<div class="modal-summary">当前账单：' + summaryText + '</div>' +
+    '<div class="modal-buttons" id="modalButtons">' + buttonsHtml + '</div>';
+
+  window._feishuSummary = summary;
+  window._feishuFileRecords = fileRecords;
+  window._feishuBtn = btn;
+  document.getElementById('feishuModal').style.display = 'flex';
+}
+
+function closeFeishuModal() {
+  document.getElementById('feishuModal').style.display = 'none';
+  window._feishuSummary = null;
+  window._feishuFileRecords = null;
+  window._feishuBtn = null;
+}
+
+function doFeishuExport(target) {
+  var summary = window._feishuSummary;
+  var mainBtn = window._feishuBtn;
+  if (!summary) return;
+
+  var btns = document.getElementById('modalButtons');
+  btns.querySelectorAll('.modal-btn').forEach(function(b) { b.disabled = true; });
+
+  fetch('/api/export_to_feishu', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ summary: summary, target: target, file_records: window._feishuFileRecords || [] })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    var dialog = document.getElementById('feishuModalDialog');
+    var targetName = target === 'dining' ? '餐饮导入' : '其他导入';
+    if (data.success) {
+      dialog.innerHTML =
+        '<div class="modal-result">' +
+          '<span class="modal-result-icon">✅</span>' +
+          '<div class="modal-result-text">已成功导入到 ' + targetName + ' 表格</div>' +
+        '</div>';
+      if (mainBtn) {
+        mainBtn.textContent = '✅ 已导入';
+        mainBtn.disabled = true;
+        mainBtn.style.background = 'linear-gradient(135deg, var(--green) 0%, var(--green-hover) 100%)';
+        mainBtn.style.boxShadow = '0 4px 14px rgba(56,211,159,.35)';
+      }
+      setTimeout(function() { closeFeishuModal(); }, 1500);
+    } else {
+      dialog.innerHTML =
+        '<div class="modal-result">' +
+          '<span class="modal-result-icon">❌</span>' +
+          '<div class="modal-result-text">导入失败</div>' +
+          '<div class="modal-result-error">' + (data.error || '未知错误') + '</div>' +
+        '</div>' +
+        '<button class="modal-close-btn" onclick="closeFeishuModal()">确定</button>';
+    }
+  })
+  .catch(function(e) {
+    var dialog = document.getElementById('feishuModalDialog');
+    dialog.innerHTML =
+      '<div class="modal-result">' +
+        '<span class="modal-result-icon">❌</span>' +
+        '<div class="modal-result-text">导入失败</div>' +
+        '<div class="modal-result-error">网络请求失败：' + e.message + '</div>' +
+      '</div>' +
+      '<button class="modal-close-btn" onclick="closeFeishuModal()">确定</button>';
+  });
+}
+
+// 点击遮罩层关闭弹窗
+document.getElementById('feishuModal').addEventListener('click', function(e) {
+  if (e.target === this) closeFeishuModal();
+});
+
+function recallMessage(messageId) {
+  if (pendingRequests[messageId]) {
+    pendingRequests[messageId].abort();
+    delete pendingRequests[messageId];
+  }
+  var userMsg = document.getElementById('user_' + messageId);
+  if (userMsg) userMsg.remove();
+  var loadingMsg = document.getElementById('loading_' + messageId);
+  if (loadingMsg) loadingMsg.remove();
+  var aiMsg = document.getElementById('ai_' + messageId);
+  if (aiMsg) aiMsg.remove();
+}
+
+function sendFiles() {
+  if (selectedFiles.length === 0) { appendSystemMessage('请先选择文件'); return; }
+  var messageId = 'msg_' + Date.now();
+  var controller = new AbortController();
+  pendingRequests[messageId] = controller;
+
+  selectedFiles.forEach(function(f) { appendUserFileMessage(f, messageId); });
+  sendBtn.disabled = true; sendBtn.textContent = '处理中...';
+  var filesToUpload = selectedFiles.slice();
+  selectedFiles = []; renderFileTags(); appendLoadingMessage(messageId);
+  var fd = new FormData();
+  filesToUpload.forEach(function(f) { fd.append('files', f); });
+  var mealInput = document.getElementById('mealTypeInput');
+  var manualMeal = mealInput ? mealInput.value.trim() : '';
+  if (manualMeal) { fd.append('meal_type', manualMeal); mealInput.value = ''; }
+  fetch('/api/upload', { method: 'POST', body: fd, signal: controller.signal })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      delete pendingRequests[messageId];
+      if (data.success) appendAssistantResponse(data, messageId); else appendErrorResponse(data.error || '处理失败', messageId);
+    })
+    .catch(function(e) {
+      delete pendingRequests[messageId];
+      if (e.name !== 'AbortError') appendErrorResponse('网络请求失败：' + e.message, messageId);
+    })
+    .finally(function() { sendBtn.disabled = false; sendBtn.textContent = '发送'; });
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    if (document.activeElement && document.activeElement.id === 'mealTypeInput') return;
+    if (selectedFiles.length > 0 && !sendBtn.disabled) {
+      e.preventDefault();
+      sendFiles();
+    }
+  }
+});
+</script>
+
+</body>
+</html>
